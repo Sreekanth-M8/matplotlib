@@ -283,6 +283,51 @@ class ThetaLocator(mticker.Locator):
         return np.deg2rad(self.base.view_limits(vmin, vmax))
 
 
+class ChoiceLocator(mticker.Locator):
+    def __init__(self, base=None, choices=None):
+        if choices is None:
+            choices = [
+                np.arange(-360, 360, 30.0),
+                np.arange(-360, 360, 45.0),
+                np.arange(-360, 360, 60.0),
+                np.arange(-360, 360, 90.0),
+            ]
+        if base is None:
+            base = mticker.AutoLocator()
+        self.choices = choices
+        self.base = base
+        self.axis = self.base.axis = _AxisWrapper(self.base.axis)
+
+    def set_axis(self, axis):
+        self.axis = _AxisWrapper(axis)
+        self.base.set_axis(self.axis)
+
+    def __call__(self):
+        lim = self.axis.get_view_interval()
+        vmin = min(lim[0], lim[1])
+        vmax = max(lim[0], lim[1])
+        max_ticks = self.axis.get_tick_space()
+        tol = 1e-12
+        if (vmax - vmin > 60):
+            for ticks in self.choices:
+                ticks = np.insert(ticks, 0, vmin)
+                if not np.isclose(360 + vmin, vmax):
+                    ticks = np.insert(ticks, -1, vmax)
+                in_range = (ticks >= vmin - tol) & (ticks <= vmax + tol)
+                ticks = ticks[in_range]
+                if len(ticks) <= max_ticks:
+                    return np.deg2rad(ticks)
+        else:
+            return np.deg2rad(self.base())
+        ticks = self.choices[-1]
+        ticks = ticks[(ticks >= vmin - tol) & (ticks <= vmax + tol)]
+        return ticks
+
+    def view_limits(self, vmin, vmax):
+        vmin, vmax = np.rad2deg((vmin, vmax))
+        return np.deg2rad(self.base.view_limits(vmin, vmax))
+
+
 class ThetaTick(maxis.XTick):
     """
     A theta-axis tick.
@@ -387,7 +432,7 @@ class ThetaAxis(maxis.XAxis):
     _tick_class = ThetaTick
 
     def _wrap_locator_formatter(self):
-        self.set_major_locator(ThetaLocator(self.get_major_locator()))
+        self.set_major_locator(ChoiceLocator(self.get_major_locator()))
         self.set_major_formatter(ThetaFormatter())
         self.isDefault_majloc = True
         self.isDefault_majfmt = True
@@ -406,7 +451,6 @@ class ThetaAxis(maxis.XAxis):
         # LinearScale.set_default_locators_and_formatters just set the major
         # locator to be an AutoLocator, so we customize it here to have ticks
         # at sensible degree multiples.
-        self.get_major_locator().set_params(steps=[1, 1.5, 3, 4.5, 9, 10])
         self._wrap_locator_formatter()
 
     def _copy_tick_props(self, src, dest):

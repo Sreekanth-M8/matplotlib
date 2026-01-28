@@ -310,9 +310,6 @@ class ChoiceLocator(mticker.Locator):
         tol = 1e-12
         if (vmax - vmin > 60):
             for ticks in self.choices:
-                ticks = np.insert(ticks, 0, vmin)
-                if not np.isclose(360 + vmin, vmax):
-                    ticks = np.insert(ticks, -1, vmax)
                 in_range = (ticks >= vmin - tol) & (ticks <= vmax + tol)
                 ticks = ticks[in_range]
                 if len(ticks) <= max_ticks:
